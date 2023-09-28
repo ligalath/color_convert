@@ -19,20 +19,22 @@
 //  G = 1.164 *(Y - 16) - 0.392 *(Cb - 128) - 0.812 *(Cr - 128)//
 //  B = 1.164 *(Y - 16) + 2.016 *(Cb - 128)                    //
 //*********************BT601***********************************//
-/****************************BT709*********************************/
-#define RGB2Y(R,G,B) (16 + 0.183 * R + 0.614 * G + 0.062 * B)
-#define RGB2U(R,G,B) (128 - 0.101 * R - 0.339 * G + 0.439 * B)
-#define RGB2V(R,G,B) (128 + 0.439 * R - 0.399 * G - 0.040 * B)
-#define YUV2R(Y,U,V) (1.164 *(Y - 16) + 1.792 *(V - 128))
-#define YUV2G(Y,U,V) (1.164 *(Y - 16) - 0.213 *(U - 128) - 0.534 *(V - 128))
-#define YUV2B(Y,U,V) (1.164 *(Y - 16) + 2.114 *(U - 128))
-/****************************BT709*********************************/
+
+/****************************BT709**********************************************///
+#define RGB2Y(R,G,B) (16 + 0.183 * R + 0.614 * G + 0.062 * B)                    //
+#define RGB2U(R,G,B) (128 - 0.101 * R - 0.339 * G + 0.439 * B)                   //
+#define RGB2V(R,G,B) (128 + 0.439 * R - 0.399 * G - 0.040 * B)                   //
+#define YUV2R(Y,U,V) (1.164 *(Y - 16) + 1.792 *(V - 128))                        //
+#define YUV2G(Y,U,V) (1.164 *(Y - 16) - 0.213 *(U - 128) - 0.534 *(V - 128))     //
+#define YUV2B(Y,U,V) (1.164 *(Y - 16) + 2.114 *(U - 128))                        //
+/****************************BT709**********************************************///
+
 #define CLIPVALUE(x, min, max) ((x) < (min)?(min):((x) > (max) ? (max) : (x)))
 /// @brief 1D grid 1D block
 /// @param src_data 
 /// @param src_stride 
 /// @param dst_data 
-/// @param dst_stride 
+/// @param dst_y_stride 
 /// @param width 
 /// @param height 
 /// @return 
@@ -46,10 +48,6 @@ __global__ void BGR2YUVJ420P(const unsigned char* src_data, const int src_stride
         int row = i / width;
         if(col >= width || row >= height)
             return;
-        if(col >= width || row >= height)
-        {
-            return;
-        }
         
         unsigned char* dst_y = dst_data;
         unsigned char* dst_u = dst_y + height * dst_y_stride;
@@ -71,6 +69,35 @@ __global__ void BGR2YUVJ420P(const unsigned char* src_data, const int src_stride
     return;
 }
 
+/// @brief convert bgra to yuva420P(color_range:jpeg)1D grid 1D block
+/// @param src_data 
+/// @param src_stride 
+/// @param dst_data 
+/// @param dst_y_stride 
+/// @param width 
+/// @param height 
+/// @return 
+__global__ void BGRA2YUVAJ420P(const unsigned char* src_data, const int src_stride, unsigned char* dst_data, int dst_y_stride, int width, int height)
+{
+    int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+    int grid_stride = blockDim.x * gridDim.x;
+    for(int i = thread_id; i < width* height; i+=grid_stride)
+    {
+        int col = i % width;
+        int row = i / width;
+        unsigned char* dst_a = dst_data + height * dst_y_stride * 3/2;
+        unsigned char a = src_data[row * src_stride + col * 3 + 3];
+        dst_a[row * dst_y_stride + col] = (unsigned char)a;
+    }
+    BGR2YUVJ420P(src_data,src_stride,dst_data,dst_y_stride,width,height);
+}
+
+__global__ void YUV420P2BGR(const unsigned char* src_data, const int src_y_stride, unsigned char* dst_data, int dst_stride, int width, int height)
+{
+    int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+    int grid_stride = blockDim.x * gridDim.x;
+
+}
 // extern "C" void RGB2J420P_cpu(const unsigned char* src_data, const int src_stride, unsigned char* dst_data, int dst_y_stride, int width, int height)
 // {
 //     unsigned char* yuv_gpu = nullptr;
@@ -94,5 +121,4 @@ void BGR2J420P_gpu(const unsigned char* src_data_gpu, const int src_stride, unsi
     {
         fprintf(stderr,"%s launch failed : %s .\n",__FUNCTION__, cudaGetErrorString(cuda_stat));
     }
-    fprintf(stderr, "%s launch succeed: %s .\n", __FUNCTION__, cudaGetErrorString(cuda_stat));
 }
