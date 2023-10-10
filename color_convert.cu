@@ -96,7 +96,26 @@ __global__ void YUV420P2BGR(const unsigned char* src_data, const int src_y_strid
 {
     int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
     int grid_stride = blockDim.x * gridDim.x;
-
+    for(int i = thread_id; i < width*height; i+=grid_stride)
+    {
+        int col = i % width;
+        int row = i / width;
+        unsigned char* dst_b = dst_data + row * dst_stride + col*3 + 0;
+        unsigned char* dst_g = dst_data + row * dst_stride + col*3 + 1;
+        unsigned char* dst_r = dst_data + row * dst_stride + col*3 + 2;
+        const unsigned char* dst_u = src_data + height * src_y_stride;
+        const unsigned char* dst_v = src_data + height * src_y_stride/4;
+        const int src_uv_stride = src_y_stride/4;
+        const int uv_row = row/2;
+        const int uv_col = col/2;
+        unsigned char y = src_data[row * src_y_stride + col];
+        unsigned char u = dst_u[uv_row *src_uv_stride + uv_col];
+        unsigned char v = dst_v[uv_row *src_uv_stride + uv_col];
+        *dst_b = (unsigned char)(CLIPVALUE(YUV2B(y, u, v), 0, 255));
+        *dst_g = (unsigned char)(CLIPVALUE(YUV2G(y, u, v), 0, 255));
+        *dst_r = (unsigned char)(CLIPVALUE(YUV2R(y, u, v), 0, 255));
+    }
+    return;
 }
 // extern "C" void RGB2J420P_cpu(const unsigned char* src_data, const int src_stride, unsigned char* dst_data, int dst_y_stride, int width, int height)
 // {
@@ -107,8 +126,14 @@ __global__ void YUV420P2BGR(const unsigned char* src_data, const int src_y_strid
 //     cudaMemcpy(rgb_gpu, rgb_mat.data, sizeof(unsigned char) * rgb_mat.rows * rgb_mat.step);
 // }
 
-void BGR2J420P_gpu(const unsigned char* src_data_gpu, const int src_stride, unsigned char* dst_data_gpu, int dst_y_stride, int width, int height)
+bool BGR2J420P_gpu(const unsigned char* src_data_gpu, const int src_stride, unsigned char* dst_data_gpu, int dst_y_stride, int width, int height)
 {
+    //width + height must be even
+    if(width % 2 != 0 || height % 2 != 0)
+    {
+        fprintf(stderr, "%s: image width and height must be even\n", __FUNCTION__);
+        return false;
+    }
     const int max_threads_per_block = 1024;
     const int max_blocks_per_grid = 2000;
     int threads_per_block = width > max_threads_per_block?max_threads_per_block:width;
@@ -120,5 +145,7 @@ void BGR2J420P_gpu(const unsigned char* src_data_gpu, const int src_stride, unsi
     if(cudaSuccess != cuda_stat)
     {
         fprintf(stderr,"%s launch failed : %s .\n",__FUNCTION__, cudaGetErrorString(cuda_stat));
+        return false;
     }
+    return true;
 }
