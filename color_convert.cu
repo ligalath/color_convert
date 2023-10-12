@@ -89,7 +89,7 @@ __global__ void BGRA2YUVAJ420P(const unsigned char* src_data, const int src_stri
         unsigned char a = src_data[row * src_stride + col * 3 + 3];
         dst_a[row * dst_y_stride + col] = (unsigned char)a;
     }
-    BGR2YUVJ420P(src_data,src_stride,dst_data,dst_y_stride,width,height);
+    BGR2YUVJ420P<<<1, 1>>>(src_data,src_stride,dst_data,dst_y_stride,width,height);
 }
 
 __global__ void YUV420P2BGR(const unsigned char* src_data, const int src_y_stride, unsigned char* dst_data, int dst_stride, int width, int height)
@@ -128,6 +128,8 @@ __global__ void YUV420P2BGR(const unsigned char* src_data, const int src_y_strid
 
 bool BGR2J420P_gpu(const unsigned char* src_data_gpu, const int src_stride, unsigned char* dst_data_gpu, int dst_y_stride, int width, int height)
 {
+    if(width < 1 || height < 1)
+        return false;
     //width + height must be even
     if(width % 2 != 0 || height % 2 != 0)
     {
