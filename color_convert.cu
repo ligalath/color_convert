@@ -10,8 +10,10 @@
  */
 
 #include <stdio.h>
+#include <memory>
+#include "utils_cuda.h"
 
-//*********************BT601***********************************//
+//*********************BT601 tv-range**************************//
 //  Y = 16  + 0.257 * R + 0.504 * g + 0.098 * b                //
 // Cb = 128 - 0.148 * R - 0.291 * g + 0.439 * b                //
 // Cr = 128 + 0.439 * R - 0.368 * g - 0.071 * b                //
@@ -20,13 +22,21 @@
 //  B = 1.164 *(Y - 16) + 2.016 *(Cb - 128)                    //
 //*********************BT601***********************************//
 
+/****************************BT709 tv-range**************************************///
+// #define RGB2Y(R,G,B) (16 + 0.183 * R + 0.614 * G + 0.062 * B)                    //
+// #define RGB2U(R,G,B) (128 - 0.101 * R - 0.339 * G + 0.439 * B)                   //
+// #define RGB2V(R,G,B) (128 + 0.439 * R - 0.399 * G - 0.040 * B)                   //
+// #define YUV2R(Y,U,V) (1.164 *(Y - 16) + 1.792 *(V - 128))                        //
+// #define YUV2G(Y,U,V) (1.164 *(Y - 16) - 0.213 *(U - 128) - 0.534 *(V - 128))     //
+// #define YUV2B(Y,U,V) (1.164 *(Y - 16) + 2.114 *(U - 128))                        //
 /****************************BT709**********************************************///
-#define RGB2Y(R,G,B) (16 + 0.183 * R + 0.614 * G + 0.062 * B)                    //
-#define RGB2U(R,G,B) (128 - 0.101 * R - 0.339 * G + 0.439 * B)                   //
-#define RGB2V(R,G,B) (128 + 0.439 * R - 0.399 * G - 0.040 * B)                   //
-#define YUV2R(Y,U,V) (1.164 *(Y - 16) + 1.792 *(V - 128))                        //
-#define YUV2G(Y,U,V) (1.164 *(Y - 16) - 0.213 *(U - 128) - 0.534 *(V - 128))     //
-#define YUV2B(Y,U,V) (1.164 *(Y - 16) + 2.114 *(U - 128))                        //
+/****************************BT709 full-range***********************************///
+#define RGB2Y(R,G,B) (0.2126* R + 0.7154 * G + 0.072 * B)                       //
+#define RGB2U(R,G,B) (128 - 0.1145 * R - 0.3855 * G + 0.500 * B)                //
+#define RGB2V(R,G,B) (128 + 0.500 * R - 0.4543 * G - 0.0457 * B)                //
+#define YUV2R(Y,U,V) (Y + 1.5748 * (V - 128))                                   //
+#define YUV2G(Y,U,V) (Y - 0.1868 * (U - 128) - 0.4680 * (V - 128))              //
+#define YUV2B(Y,U,V) (Y + 1.856 * (U - 128))                                    //
 /****************************BT709**********************************************///
 
 #define CLIPVALUE(x, min, max) ((x) < (min)?(min):((x) > (max) ? (max) : (x)))
@@ -150,4 +160,18 @@ bool BGR2J420P_gpu(const unsigned char* src_data_gpu, const int src_stride, unsi
         return false;
     }
     return true;
+}
+
+bool BGR2J420P_cpu(const unsigned char* src_data_cpu, const int src_stride, unsigned char* dst_data_cpu, int dst_y_stride, int width, int height)
+{
+    unsigned char* yuv_gpu_ptr =nullptr; 
+    unsigned char* bgr_gpu_ptr =nullptr; 
+    cudaMalloc((void **)(&(yuv_gpu_ptr)), sizeof(unsigned char) * width * height * 3 / 2);
+    cudaMalloc((void **)&(bgr_gpu_ptr), sizeof(unsigned char) * src_stride * height);
+    std::unique_ptr<unsigned char, decltype(CudaDelete)*> yuv_gpu(yuv_gpu_ptr, CudaDelete);
+    std::unique_ptr<unsigned char, decltype(CudaDelete)*> bgr_gpu(bgr_gpu_ptr, CudaDelete);
+    cudaMemcpy(bgr_gpu.get(), src_data_cpu, sizeof(unsigned char) * src_stride * height, cudaMemcpyHostToDevice);
+    bool success = BGR2J420P_gpu(bgr_gpu.get(), src_stride, yuv_gpu.get(), width, width, height);
+    cudaMemcpy(dst_data_cpu, yuv_gpu_ptr, sizeof(unsigned char) * width * height * 3 / 2, cudaMemcpyDeviceToHost);
+    return success;
 }

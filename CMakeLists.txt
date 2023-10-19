@@ -18,9 +18,10 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 # target_link_libraries(color_convert ${OpenCV_LIBS})
 
 #use cuda from source
-message("cuda_nvcc_flags: ${CMAKE_CUDA_FLAGS}")
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -rdc=true")
 message("cuda_nvcc_flags: ${CMAKE_CUDA_FLAGS}")
-add_library(cuda_color_convert color_convert.cu)
+add_library(cuda_color_convert SHARED color_convert.cu utils_cuda.cpp)
+message("cuda libs: ${CUDA_LIBRARIES}")
+target_link_libraries(cuda_color_convert ${CUDA_LIBRARIES})
 add_executable(color_convert main.cpp)
 target_link_libraries(color_convert ${OpenCV_LIBS} cuda_color_convert)

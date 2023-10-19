@@ -13,8 +13,10 @@
 #include <opencv2/opencv.hpp>
 
 #include "utils_cuda.h"
+#include <cuda_runtime.h>
 #include "utils_log.h"
 extern void BGR2J420P_gpu(const unsigned char* src_data_gpu, const int src_stride, unsigned char* dst_data_gpu, int dst_y_stride, int width, int height);
+extern void BGR2J420P_cpu(const unsigned char* src_data_gpu, const int src_stride, unsigned char* dst_data_gpu, int dst_y_stride, int width, int height);
 int main()
 {
     cv::Mat bgr_mat = cv::imread("test.jpg", cv::IMREAD_UNCHANGED);
@@ -24,25 +26,29 @@ int main()
     }
     unsigned char* yuv_gpu = nullptr;
     unsigned char* bgr_gpu = nullptr;
-    TIC(cudaMalloc);
-    cudaMalloc((void**)&yuv_gpu, sizeof(unsigned char)* bgr_mat.cols * bgr_mat.rows * 3/2);
-    cudaMalloc((void**)&bgr_gpu, sizeof(unsigned char)* bgr_mat.cols * bgr_mat.rows * 3);
-    TOC(cudaMalloc);
-    TIC(convert);
-    TIC(cudaMemcpy1);
-    cudaMemcpy(bgr_gpu, bgr_mat.data, sizeof(unsigned char) * bgr_mat.rows * bgr_mat.step, cudaMemcpyHostToDevice);
-    TOC(cudaMemcpy1);
-    int y_stride = bgr_mat.cols;
-    BGR2J420P_gpu(bgr_gpu, bgr_mat.cols*3, yuv_gpu, y_stride, bgr_mat.cols, bgr_mat.rows);
+    // TIC(cudaMalloc);
+    // cudaMalloc((void**)&yuv_gpu, sizeof(unsigned char)* bgr_mat.cols * bgr_mat.rows * 3/2);
+    // cudaMalloc((void**)&bgr_gpu, sizeof(unsigned char)* bgr_mat.cols * bgr_mat.rows * 3);
+    // TOC(cudaMalloc);
+    // TIC(convert);
+    // TIC(cudaMemcpy1);
+    // cudaMemcpy(bgr_gpu, bgr_mat.data, sizeof(unsigned char) * bgr_mat.rows * bgr_mat.step, cudaMemcpyHostToDevice);
+    // TOC(cudaMemcpy1);
+    // int y_stride = bgr_mat.cols;
+    // BGR2J420P_gpu(bgr_gpu, bgr_mat.cols*3, yuv_gpu, y_stride, bgr_mat.cols, bgr_mat.rows);
+
+    // std::unique_ptr<unsigned char[]> yuv_cpu(new unsigned char[bgr_mat.cols * bgr_mat.rows * 3/2]);
+    // unsigned char* yuv_cpu_ptr = yuv_cpu.get();
+    // TIC(cudaMemcpy2);
+    // cudaMemcpy(yuv_cpu_ptr, yuv_gpu, sizeof(unsigned char) * bgr_mat.cols * bgr_mat.rows * 3/2, cudaMemcpyDeviceToHost);
+    // TOC(cudaMemcpy2);
+    // TOC(convert);
+    // cudaFree(yuv_gpu);
+    // cudaFree(bgr_gpu);
 
     std::unique_ptr<unsigned char[]> yuv_cpu(new unsigned char[bgr_mat.cols * bgr_mat.rows * 3/2]);
     unsigned char* yuv_cpu_ptr = yuv_cpu.get();
-    TIC(cudaMemcpy2);
-    cudaMemcpy(yuv_cpu_ptr, yuv_gpu, sizeof(unsigned char) * bgr_mat.cols * bgr_mat.rows * 3/2, cudaMemcpyDeviceToHost);
-    TOC(cudaMemcpy2);
-    TOC(convert);
-    cudaFree(yuv_gpu);
-    cudaFree(bgr_gpu);
+    BGR2J420P_cpu(bgr_mat.data, bgr_mat.cols*3, yuv_cpu.get(), bgr_mat.cols, bgr_mat.cols, bgr_mat.rows);
 
     //write
     FILE* fp_yuv = fopen("./out.yuv", "wb");
